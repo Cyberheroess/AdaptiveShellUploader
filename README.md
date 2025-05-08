@@ -1,4 +1,4 @@
-```
+
 # AdaptiveShellUploader
 **Upload your shell, bypass WAFs, and own the web — one upload at a time.**
 
